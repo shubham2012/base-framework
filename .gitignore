@@ -1,0 +1,12 @@
+.idea/*
+*.iml
+mvnw.cmd
+.mvn/*
+.DS_Store*
+*logs
+lib/
+target/*
+java/target/*
+commons/target/*
+service/target/*
+.vscode

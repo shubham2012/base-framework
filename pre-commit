@@ -1,0 +1,23 @@
+#!/bin/bash
+echo "Running Maven clean test for errors"
+# retrieving current working directory
+CWD=`pwd`
+MAIN_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# go to main project dir
+cd $MAIN_DIR/../../
+# running maven clean test
+mvn clean install
+if [ $? -ne 0 ]; then
+  "Error while testing the code"
+  # go back to current working dir
+  cd $CWD
+  exit 1
+fi
+changed_java_files=$(git diff --cached --name-only --diff-filter=ACMR | grep ".*java$" || true)
+if [[ -n "$changed_java_files" ]]
+then
+    echo "adding $changed_java_files"
+    git add $changed_java_files
+fi
+# go back to current working dir
+cd $CWD
