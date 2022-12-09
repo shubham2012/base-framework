@@ -19,6 +19,8 @@
         <google.formatter.version>1.7.3</google.formatter.version>
         <maven.compiler.version>3.8.0</maven.compiler.version>
         <version>0.0.1-SNAPSHOT</version>
+        <repository-name>base-framework</repository-name>
+        <repository-owner>shubham2012</repository-owner>
     </properties>
 
     <dependencies>
@@ -67,9 +69,13 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
                 <version>3.0.0-M1</version>
+                <configuration>
+                    <altDeploymentRepository>
+                        internal.repo::default::file://${project.build.directory}/mvn-artifact
+                    </altDeploymentRepository>
+                </configuration>
                 <dependencies>
                     <dependency>
                         <groupId>jakarta.xml.bind</groupId>
@@ -84,12 +90,51 @@
                 </dependencies>
             </plugin>
             <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>versions-maven-plugin</artifactId>
                 <version>2.5</version>
                 <configuration>
                     <generateBackupPoms>false</generateBackupPoms>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>com.github.github</groupId>
+                <artifactId>site-maven-plugin</artifactId>
+                <version>0.12</version>
+                <configuration>
+                    <message>Maven artifacts for ${project.version}</message>
+                    <noJekyll>true</noJekyll>
+                    <outputDirectory>${project.build.directory}</outputDirectory>
+                    <branch>refs/heads/main</branch>
+                    <includes>
+                        <include>**/*</include>
+                    </includes>
+                    <merge>true</merge>
+                    <repositoryName>${repository-name}</repositoryName>
+                    <repositoryOwner>${repository-owner}</repositoryOwner>
+                    <server>github</server>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>site</goal>
+                        </goals>
+                        <phase>deploy</phase>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
         <extensions>
@@ -114,25 +159,11 @@
     </dependencyManagement>
 
     <distributionManagement>
-        <snapshotRepository>
-            <id>ula-maven-snapshots</id>
-            <url>s3://ula-maven-snapshots</url>
-        </snapshotRepository>
         <repository>
-            <id>ula-maven-releases</id>
-            <name>Internal repo</name>
-            <url>s3://ula-maven-releases</url>
+            <id>internal.repo</id>
+            <name>Base Framework Repository</name>
+            <url>file://${project.build.directory}/mvn-artifact</url>
         </repository>
     </distributionManagement>
-    <repositories>
-        <repository>
-            <id>ula-maven-snapshots</id>
-            <url>s3://ula-maven-snapshots</url>
-        </repository>
-        <repository>
-            <id>ula-maven-releases</id>
-            <name>Internal repo</name>
-            <url>s3://ula-maven-releases</url>
-        </repository>
-    </repositories>
+
 </project>

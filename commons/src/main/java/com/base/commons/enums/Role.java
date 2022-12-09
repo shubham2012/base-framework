@@ -2,7 +2,7 @@ package com.base.commons.enums;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 
-/** We define all the possible roles here for the ULA */
+/** We define all the possible roles here */
 public enum Role {
     USER("user"),
     ADMIN("admin"),
