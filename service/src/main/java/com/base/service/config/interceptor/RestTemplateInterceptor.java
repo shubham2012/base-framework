@@ -7,6 +7,7 @@ import com.base.utils.JwtUtil;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +50,9 @@ public class RestTemplateInterceptor implements ClientHttpRequestInterceptor {
 
     private final JwtUtil jwtUtil;
 
+    @Value("${external.call.auth.exclusions}")
+    private String[] EXTERNAL_CALL_AUTH_EXCLUSIONS;
+
     /**
      * Intercept the outgoing request and add additional parameters to it
      *
@@ -65,10 +69,32 @@ public class RestTemplateInterceptor implements ClientHttpRequestInterceptor {
         request.getHeaders().setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
         request.getHeaders().setBearerAuth(jwtUtil.createToken(Role.SERVICE));
         request.getHeaders().set(REQUEST_SOURCE, serviceName);
+        String requestURI = request.getURI().toString();
+        boolean external_call_auth_exclusions = externalCallAuthExclusion(requestURI);
+        if (!external_call_auth_exclusions) {
+            request.getHeaders().setBearerAuth(jwtUtil.createToken(Role.SERVICE));
+        }
         log.info("Out going call to : " + request.getURI());
         log.info("Data: " + new String(body, StandardCharsets.UTF_8));
         ClientHttpResponse response = execution.execute(request, body);
         return response;
+    }
+
+    /**
+     * check if request uri is a part of external call auth exclusions
+     *
+     * @param requestURI
+     * @return
+     */
+    private boolean externalCallAuthExclusion(String requestURI) {
+        if (Objects.nonNull(EXTERNAL_CALL_AUTH_EXCLUSIONS) && EXTERNAL_CALL_AUTH_EXCLUSIONS.length > 0) {
+            for (String ex : EXTERNAL_CALL_AUTH_EXCLUSIONS) {
+                if (requestURI.contains(ex)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

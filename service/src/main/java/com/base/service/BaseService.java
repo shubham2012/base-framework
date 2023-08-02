@@ -11,16 +11,26 @@ import com.base.commons.utils.PageUtil;
 import com.base.service.entity.BaseEntity;
 import com.base.service.mapper.BaseMapper;
 import com.base.service.repository.BaseRepository;
+import com.base.utils.BaseCriteria;
+import com.base.utils.BaseCriteriaParser;
+import com.base.utils.BaseSpecification;
+import com.base.utils.BaseSpecificationBuilder;
 import com.base.utils.CommonsUtil;
 import com.base.utils.SearchUtility;
+import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import javax.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.ObjectUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -37,6 +47,9 @@ import org.springframework.util.CollectionUtils;
 @Getter
 public abstract class BaseService<T extends BaseEntity, R extends BaseEntry> {
 
+    /** Initialising the base specification parser. */
+    private static final BaseCriteriaParser PARSER = new BaseCriteriaParser();
+
     /**
      * Initialising the repository associated with the service. You are suppose to set this while extending this service
      */
@@ -44,6 +57,12 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseEntry> {
 
     /** Initialising the mapper associated with the service. You are suppose to set this while extending this service */
     protected BaseMapper<R, T> mapper;
+
+    /** Initialising the base specification converter. */
+    private final Function<BaseCriteria, BaseSpecification<T>> converter = BaseSpecification::new;
+
+    /** Initialising the base specification builder. */
+    private final BaseSpecificationBuilder<T> builder = new BaseSpecificationBuilder<>();
 
     /**
      * Creates the entity provided in the request
@@ -100,7 +119,7 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseEntry> {
     @Transactional(readOnly = true)
     public R get(@NonNull final long id) {
         Optional<T> entityOptional = getRepository().findById(id);
-        if (!entityOptional.isPresent()) {
+        if (entityOptional.isEmpty()) {
             throw new BadRequestException(BaseMessages.DATA_NOT_FOUND.get(id));
         }
         return entityOptional.map(mapper::entityToEntry).get();
@@ -135,18 +154,77 @@ public abstract class BaseService<T extends BaseEntity, R extends BaseEntry> {
     public PageResponse search(Integer offset, Integer limit, Sort.Direction direction, String sortBy) {
 
         SearchUtility searchData = new SearchUtility(offset, limit, direction, sortBy).initializeDefault();
-        offset = searchData.getOffset();
-        limit = searchData.getLimit();
-        direction = searchData.getDirection();
-        sortBy = searchData.getSortBy();
-
-        searchData.validate();
-
-        PageRequest pageRequest = CommonsUtil.getPageRequest(offset, limit, direction, sortBy);
+        PageRequest pageRequest =
+                CommonsUtil.getPageRequest(
+                        searchData.getOffset(),
+                        searchData.getLimit(),
+                        searchData.getDirection(),
+                        searchData.getSortBy());
         Page<T> page = getRepository().findAll(pageRequest);
         List<T> content = page.getContent();
         List<R> responseData = getMapper().entityToEntry(content);
-        PageDetail pageDetail = PageUtil.getPage(page.getTotalPages(), offset, page.getSize());
+        PageDetail pageDetail = PageUtil.getPage(page.getTotalPages(), searchData.getOffset(), page.getSize());
         return new PageResponse(pageDetail, page.getTotalElements(), responseData);
+    }
+
+    /**
+     * Search data based on provided parameters and search by Default values will be initialised if not provided
+     * Validate max page fetch limit as 100
+     *
+     * @param offset default 0
+     * @param limit default 10
+     * @param direction default DESC
+     * @param sortBy default id
+     * @return
+     */
+    @Transactional(readOnly = true)
+    public PageResponse<R> search(
+            final String searchBy, Integer offset, Integer limit, Sort.Direction direction, String sortBy) {
+
+        final SearchUtility searchData = new SearchUtility(offset, limit, direction, sortBy).initializeDefault();
+        searchData.validate();
+
+        final PageRequest pageRequest =
+                CommonsUtil.getPageRequest(
+                        searchData.getOffset(),
+                        searchData.getLimit(),
+                        searchData.getDirection(),
+                        searchData.getSortBy());
+
+        Page<T> page;
+        if (ObjectUtils.isNotEmpty(searchBy)) {
+            final Deque<?> postFixedExprStack = PARSER.parse(searchBy);
+            validateCriteriaStack(postFixedExprStack);
+            final Specification<T> specification = builder.build(postFixedExprStack, converter);
+            page = getRepository().findAll(specification, pageRequest);
+        } else {
+            page = getRepository().findAll(pageRequest);
+        }
+        final List<T> content = page.getContent();
+        final List<R> responseData = getMapper().entityToEntry(content);
+        final PageDetail pageDetail = PageUtil.getPage(page.getTotalPages(), searchData.getOffset(), page.getSize());
+        return new PageResponse<>(pageDetail, page.getTotalElements(), responseData);
+    }
+
+    protected void validateCriteriaStack(final Deque<?> postFixedExprStack) {
+
+        final Iterator<?> iterator = postFixedExprStack.descendingIterator();
+
+        while (iterator.hasNext()) {
+            final Object next = iterator.next();
+
+            if (next instanceof BaseCriteria && checkInvalidCriteria().test((BaseCriteria) next)) {
+                throw new BadRequestException(BaseMessages.CRITERIA_VALIDATOR_FAILED.get(next));
+            }
+        }
+    }
+
+    /**
+     * This is meant to be overridden to add validations to Criteria, will pass all Criteria otherwise. Tests to false
+     * for valid criteria.
+     */
+    protected Predicate<BaseCriteria> checkInvalidCriteria() {
+
+        return baseCriteria -> false;
     }
 }
