@@ -119,11 +119,12 @@ public abstract class BaseController<T extends BaseEntity, R extends BaseEntry, 
      */
     @GetMapping(value = "/search", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity search(
+            @RequestParam(value = "by", defaultValue = "") String searchBy,
             @RequestParam(value = "offset", defaultValue = "0") Integer offset,
             @RequestParam(value = "limit", defaultValue = "10") Integer limit,
             @RequestParam(value = "sortDir", defaultValue = "DESC") Sort.Direction direction,
             @RequestParam(value = "sortBy", defaultValue = "id") String sortBy) {
-        PageResponse pageResponse = getService().search(offset, limit, direction, sortBy);
+        PageResponse<R> pageResponse = getService().search(searchBy, offset, limit, direction, sortBy);
         List<R> data = pageResponse.getData();
         S responseData = createResponse(data);
         responseData.setPageDetail(pageResponse.getPageDetail());

@@ -21,7 +21,8 @@ public enum BaseMessages {
             "key \"{0}\" not present in the service config so no need to capture the update"),
     MESSAGE_RECEIVED_REDIS_PUB_SUB("Message received from silhouette channel: {0}, message: {1}"),
     CONFIGURATION_UPDATE_FAILED(
-            "Unable to update the config value from silhouette: message: {0}, errorMessage: {1}, error: {2}");
+            "Unable to update the config value from silhouette: message: {0}, errorMessage: {1}, error: {2}"),
+    CRITERIA_VALIDATOR_FAILED("Criteria Validator failed for criteria :: {1}");
 
     public final String value;
 
